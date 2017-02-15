@@ -4,18 +4,18 @@ LowPass lp;
 boolean showSecond=true, showOriginal, showDerivative=true, showPeaks=true;
 int fileIndex=0;
 int derivativeScale=25;
-IntList peaks;
+FloatList peaks;
 int to, from;
 
-IntList processData(int[] rawData
+FloatList processData(int[] rawData)
 {
   return processData(rawData, 25, 20);
 }
 
 
-IntList processData(int[] rawData, int filterDegree, int derivativeFilterDegree)
+FloatList processData(int[] rawData, int filterDegree, int derivativeFilterDegree)
 {
-  peaks=new IntList();
+  peaks=new FloatList();
   int numPoints=rawData.length;
 
   buffer=new int[numPoints];
@@ -26,32 +26,30 @@ IntList processData(int[] rawData, int filterDegree, int derivativeFilterDegree)
   secondPass=lowPass(rawData, filterDegree);  //phase-correct low-pass
   for (int i=0; i<numPoints-1; i++)
     derivative[i]=secondPass[i+1]-secondPass[i];
-  filteredDerivative=lowPass(derivative, derivativeFilterDegree);
-
-  /*
-  
-  //oldCode that might be useful
-  int inc=4;
-  for (int i=0; i<numPoints-inc; i+=inc)
-  {
-    derivative[i]=secondPass[i+inc]-secondPass[i];
-    lp.input(derivative[i]);
-    buffer[i]=(int)lp.output;
-  }
-  */
-  //unfiltered derivative
-  /*
-   for (int i=0; i<numPoints-1; i++)
-   if ((derivative[i+1]<=0)&&(derivative[i]>0))
-   peaks.append(i+1);
-   */
-
+  filteredDerivative=lowPass(derivative, derivativeFilterDegree);    
   for (int i=0; i<numPoints-1; i++)
   {
     if ((filteredDerivative[i+1]<=0)&&(filteredDerivative[i]>0))
       peaks.append(i+1);
   }  
   return peaks;
+}
+
+
+void findDerivativePeaks()
+{
+  int[] data;
+  for(int i=0;i<numPorts;i++)
+    {
+      data=new int[horizontalScanLength];
+      for(int j=0;j<horizontalScanLength;j++)
+        data[j]=horizontalScan[j][i];
+      horizontalPeaks[i]=processData(data);
+      data=new int[diagonalScanLength];
+      for(int j=0;j<diagonalScanLength;j++)
+        data[j]=diagonalScan[j][i];
+      diagonalPeaks[i]=processData(data);
+    }
 }
 
 IntList bruteForce(int[] data, int locality)
@@ -81,7 +79,7 @@ IntList bruteForce(int[] data, int locality)
 
 
 
-int[] lowPass(int[] data)
+int[] lowPass(int[] data, int filterDegree)
 {
   int numPoints=data.length;
 

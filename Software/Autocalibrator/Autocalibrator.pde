@@ -16,7 +16,7 @@ int[][] diagonalDerivative;
 int locality=1;
 FloatList[] horizontalLocalityPeaks, diagonalLocalityPeaks;
 int horizontalScanLength=1080; 
-int diagonalScanLength=3050; //(1920+1080)
+int diagonalScanLength=3050; //(1920+1080+2*width of line*1.414)
 boolean displayData=false;
 boolean scanning=false;
 int position=0;
@@ -33,14 +33,16 @@ int integrationTime=100;
 int skip=10;
 int numSlices=10;
 boolean selectedData=false;
-boolean showDezPeaks=false;
-boolean showDerivativePeaks=false;
-boolean showLocality=true;
+boolean showDezPeaks=true;
+boolean showDerivativePeaks=true;
+boolean showLocality=false;
 FloatList[] horizontalPeaks;
 FloatList[] diagonalPeaks;
 
-int[][] dezHorizontalPeaks;
-int[][] dezDiagonalPeaks;
+FloatList[] dezHorizontalPeaks;
+FloatList[] dezDiagonalPeaks;
+FloatList[] dezPostProcessedHorizontalPeaks;
+FloatList[] dezPostProcessedDiagonalPeaks;
 int lastFrame;
 int minPeakInc=5;
 int minFreqInc=5;
@@ -56,14 +58,18 @@ int scale=25;
 
 void setup()
 {
+  //be sure to run in fullscreen mode if you're collecting data
   size(displayWidth, displayHeight);
+
+  //run.txt holds the latest run number, so each time we collect data, we save it in a sequentially numbered file
   String[] lines=loadStrings(dataPath("run.txt"));
   run=int(lines[0])+1;
-  println(run);
-  loadData("run 40.csv");
+  loadData("run 40.csv");  //comment this line out to actually collect data from the sensors.  If we run loadData, it skips the data collection and goes straight to analysis, so you can run it without any hardware connected
   setupSensors();
 }
 
+
+//loads data from a file
 void loadData(String filename)
 {
   numPorts=9;
@@ -77,8 +83,8 @@ void loadData(String filename)
   horizontalLowPass=new int[horizontalScanLength][numPorts];
   diagonalDerivative=new int[diagonalScanLength][numPorts];
 
-  dezHorizontalPeaks=new int[numSlices][numPorts];
-  dezDiagonalPeaks=new int[numSlices][numPorts];
+  dezHorizontalPeaks=new FloatList[numPorts];
+  dezDiagonalPeaks=new FloatList[numPorts];
 
   horizontalDerivative=new int[horizontalScanLength][numPorts];
   horizontalPeaks=new FloatList[numPorts];
@@ -92,11 +98,7 @@ void loadData(String filename)
     for (int i=0; i<horizontalScanLength; i++)
       horizontalScan[i][j]=int(parts[i]);
   }
-  if (fancyPeaks)
-    fancyPeaks();
-  else
-    simplePeaks();
-  //    findPeaks();
+  findPeaks();
 
   /*
   for (int i=0; i<horizontalPeaks[0].size (); i++)
@@ -132,10 +134,10 @@ void simplePeaks()
   }
 }
 
-void fancyPeaks()
+void findPeaks()
 {
   int[] data;
-  float[] peaks;
+  FloatList peaks;
   int[] numHorizontalPeaks=new int[numPorts];
   int[] numDiagonalPeaks=new int[numPorts];
   bestHorizontalSettings=new PVector[numPorts];
@@ -159,183 +161,22 @@ void fancyPeaks()
   diagonalPeaks=new FloatList[numPorts];
 
 
-
   for (int i=0; i<numPorts; i++)
   {
     bestHorizontalSettings[i]=new PVector();
     bestDiagonalSettings[i]=new PVector();
+    dezPostProcessedHorizontalPeaks[i]=new FloatList();
+    dezHorizontalPeaks[i]=new FloatList();
+    dezPostProcessedDiagonalPeaks[i]=new FloatList();
+    dezDiagonalPeaks[i]=new FloatList();
+    diagonalPeaks[i]=new FloatList();
+    horizontalPeaks[i]=new FloatList();
   }  
   int num;
 
-
-
-
-  ///     scan through all possible peaks
-  for (allowedDeviation=0; allowedDeviation<.2; allowedDeviation+=.05)
-    for (minPeakFreq=5; minPeakFreq<30; minPeakFreq++)
-      for (minPeakAmplitude=5; minPeakAmplitude<50; minPeakAmplitude++)
-      {
-        //        println(allowedDeviation+" "+minPeakFreq+" "+minPeakAmplitude);
-        for (int j=0; j<numPorts; j++)
-        {
-          data=new int[horizontalScanLength];
-          for (int i=0; i<data.length; i++)
-            data[i]=horizontalScan[i][j];
-          data=lowPass(data);
-          peaks=getPeaksFromData(minPeakAmplitude, minPeakFreq, numSlices, allowedDeviation, data);
-          num=0;
-          for (int k=0; k<numSlices; k++)
-            if (peaks[k]>0)
-              num++;
-          if (num>numHorizontalPeaks[j])   
-          {    
-            numHorizontalPeaks[j]=num;
-            bestHorizontalSettings[j]=new PVector(allowedDeviation, minPeakFreq, minPeakAmplitude);
-            for (int peak=0; peak<numSlices; peak++)
-              dezHorizontalPeaks[peak][j]=(int)peaks[peak];
-          }
-          data=new int[diagonalScanLength];
-          for (int i=0; i<data.length; i++)
-            data[i]=diagonalScan[i][j];
-          data=lowPass(data);
-          peaks=getPeaksFromData(minPeakAmplitude, minPeakFreq, numSlices, allowedDeviation, data);
-          num=0;
-          for (int k=0; k<numSlices; k++)
-            if (peaks[k]>0)
-              num++;
-          if (num>numDiagonalPeaks[j])   
-          {    
-            bestDiagonalSettings[j]=new PVector(allowedDeviation, minPeakFreq, minPeakAmplitude);
-            numDiagonalPeaks[j]=num;
-            for (int peak=0; peak<numSlices; peak++)
-              dezDiagonalPeaks[peak][j]=(int)peaks[peak];
-          }
-        }
-      }
-  //
-
-
-  /*
-  
-   for (allowedDeviation=0; allowedDeviation<.2; allowedDeviation+=.05)
-   for (minPeakFreq=5; minPeakFreq<30; minPeakFreq++)
-   for (minPeakAmplitude=5; minPeakAmplitude<50; minPeakAmplitude++)
-   {
-   //        println(allowedDeviation+" "+minPeakFreq+" "+minPeakAmplitude);
-   for (int j=0; j<numPorts; j++)
-   {
-   data=new int[horizontalScanLength];
-   for (int i=0; i<data.length; i++)
-   data[i]=horizontalScan[i][j];
-   data=lowPass(data);
-   peaks=getPeaksFromData(minPeakAmplitude, minPeakFreq, numSlices, allowedDeviation, data);
-   num=0;
-   for (int k=0; k<numSlices; k++)
-   if (peaks[k]>0)
-   num++;
-   if (num>numHorizontalPeaks[j])   
-   {    
-   numHorizontalPeaks[j]=num;
-   bestHorizontalSettings[j]=new PVector(allowedDeviation, minPeakFreq, minPeakAmplitude);
-   for (int peak=0; peak<numSlices; peak++)
-   dezHorizontalPeaks[peak][j]=(int)peaks[peak];
-   }
-   data=new int[diagonalScanLength];
-   for (int i=0; i<data.length; i++)
-   data[i]=diagonalScan[i][j];
-   data=lowPass(data);
-   peaks=getPeaksFromData(minPeakAmplitude, minPeakFreq, numSlices, allowedDeviation, data);
-   num=0;
-   for (int k=0; k<numSlices; k++)
-   if (peaks[k]>0)
-   num++;
-   if (num>numDiagonalPeaks[j])   
-   {    
-   bestDiagonalSettings[j]=new PVector(allowedDeviation, minPeakFreq, minPeakAmplitude);
-   numDiagonalPeaks[j]=num;
-   for (int peak=0; peak<numSlices; peak++)
-   dezDiagonalPeaks[peak][j]=(int)peaks[peak];
-   }
-   }
-   }
-   */
-  //
+  findBestDezPeaks();  //loop through all possibilities of dez's filter values, looking for the most peaks
+  findDerivativePeaks();  //find all the peaks using the derivative method  
 }
-
-void findPeaks()
-{
-  bestHorizontalSettings=new PVector[numPorts];
-  bestDiagonalSettings=new PVector[numPorts];
-  diagonalLowPass=new int[diagonalScanLength][numPorts];
-  horizontalLowPass=new int[horizontalScanLength][numPorts];
-  diagonalDerivative=new int[diagonalScanLength][numPorts];
-
-  dezHorizontalPeaks=new int[numSlices][numPorts];
-  dezDiagonalPeaks=new int[numSlices][numPorts];
-
-  horizontalDerivative=new int[horizontalScanLength][numPorts];
-  horizontalPeaks=new FloatList[numPorts];
-  diagonalPeaks=new FloatList[numPorts];
-  int[] data;
-  float[] peaks;
-  for (int j=0; j<numPorts; j++)
-  {
-    data=new int[horizontalScanLength];
-    for (int i=0; i<data.length; i++)
-      data[i]=horizontalScan[i][j];
-    peaks=getPeaksFromData(minPeakAmplitude, minPeakFreq, numSlices, allowedDeviation, data);
-    for (int peak=0; peak<numSlices; peak++)
-      dezHorizontalPeaks[peak][j]=(int)peaks[peak];
-    data=new int[diagonalScanLength];
-    for (int i=0; i<data.length; i++)
-      data[i]=diagonalScan[i][j];
-    peaks=getPeaksFromData(minPeakAmplitude, minPeakFreq, numSlices, allowedDeviation, data);
-    for (int peak=0; peak<numSlices; peak++)
-      dezDiagonalPeaks[peak][j]=(int)peaks[peak];
-  }
-
-
-  for (int j=0; j<numPorts; j++)
-  {
-    data=new int[horizontalScanLength];
-    //    println(data.length);
-    for (int i=0; i<data.length; i++)
-      data[i]=horizontalScan[i][j];  
-
-
-
-    IntList unfilteredPeaks=processData(lowPass(data));
-    horizontalPeaks[j]=new FloatList();
-    for (int i=0; i<unfilteredPeaks.size (); i++)
-      horizontalPeaks[j].append((int)unfilteredPeaks.get(i));
-    //horizontalPeaks[j]=justPeaks(minPeakAmplitude, minPeakFreq, numSlices, allowedDeviation, data);   
-    //    horizontalPeaks[j]=derivativeFilter(minPeakAmplitude, minPeakFreq, numSlices, allowedDeviation, unfilteredPeaks);
-    for (int i=0; i<data.length; i++)
-    {
-      horizontalLowPass[i][j]=secondPass[i];
-      horizontalDerivative[i][j]=filteredDerivative[i];
-    }
-    data=new int[diagonalScanLength];
-    for (int i=0; i<data.length; i++)
-      data[i]=diagonalScan[i][j];
-    //    diagonalPeaks[j]=processData(data);
-    unfilteredPeaks=processData(lowPass(data));
-    /*
-    unfilteredPeaks=processData(data);
-     diagonalPeaks[j]=derivativeFilter(minPeakAmplitude, minPeakFreq, numSlices, allowedDeviation, unfilteredPeaks);
-     */
-    diagonalPeaks[j]=new FloatList();
-    for (int i=0; i<unfilteredPeaks.size (); i++)
-      diagonalPeaks[j].append((int)unfilteredPeaks.get(i));
-    //diagonalPeaks[j]=justPeaks(minPeakAmplitude, minPeakFreq, numSlices, allowedDeviation, data);
-    for (int i=0; i<data.length; i++)
-    {
-      diagonalLowPass[i][j]=secondPass[i];
-      diagonalDerivative[i][j]=filteredDerivative[i];
-    }
-  }
-}
-
 
 void draw()
 {
@@ -466,11 +307,9 @@ void draw()
         if (showDezPeaks)
         {
           stroke(0, 0, 255);
-          for (int i=0; i<numSlices; i++)
-            line(map(dezHorizontalPeaks[i][selectedIndex], 0, horizontalScanLength, 0, width), 0, map(dezHorizontalPeaks[i][selectedIndex], 0, horizontalScanLength, 0, width), height);
+          for (int i=0; i<dezHorizontalPeaks[selectedIndex].size (); i++)
+            line(map(dezHorizontalPeaks[selectedIndex].get(i), 0, horizontalScanLength, 0, width), 0, map(dezHorizontalPeaks[selectedIndex].get(i), 0, horizontalScanLength, 0, width), height);
           fill(255);
-          for (int i=0; i<numSlices; i++)
-            text(dezHorizontalPeaks[i][selectedIndex], 10, 50+20*i);
           if (fancyPeaks)
             text(bestHorizontalSettings[selectedIndex].x+" "+bestHorizontalSettings[selectedIndex].y+" "+bestHorizontalSettings[selectedIndex].z, width-200, 50);
         }
@@ -503,23 +342,21 @@ void draw()
           stroke(255, 255, 0);
           //  for (int i=0; i<diagonalPeaks[selectedIndex].size (); i++)
           //    line(diagonalPeaks[selectedIndex].get(i), 0, diagonalPeaks[selectedIndex].get(i), height);
-          stroke(0, 255, 0);
+          stroke(255, 0, 0);
           for (int i=0; i<diagonalScanLength-1; i++)
             line(map(i, 0, diagonalScanLength, 0, width), displayHeight(diagonalLowPass[i][selectedIndex], selectedIndex), map(i+1, 0, diagonalScanLength, 0, width), displayHeight(diagonalLowPass[i+1][selectedIndex], selectedIndex));
           for (int i=0; i<diagonalPeaks[selectedIndex].size (); i++)
             line(map(diagonalPeaks[selectedIndex].get(i), 0, diagonalScanLength, 0, width), 0, map(diagonalPeaks[selectedIndex].get(i), 0, diagonalScanLength, 0, width), height);
-          stroke(255, 0, 0);
+          stroke(0, 255, 0);
           for (int i=0; i<diagonalScanLength-1; i++)
             line(map(i, 0, diagonalScanLength, 0, width), displayHeight(scale*diagonalDerivative[i][selectedIndex], selectedIndex), map(i+1, 0, diagonalScanLength, 0, width), displayHeight(scale*diagonalDerivative[i+1][selectedIndex], selectedIndex));
         } 
         if (showDezPeaks)
         {
           stroke(0, 0, 255);
-          for (int i=0; i<numSlices; i++)
-            line(map(dezDiagonalPeaks[i][selectedIndex], 0, diagonalScanLength, 0, width), 0, map(dezDiagonalPeaks[i][selectedIndex], 0, diagonalScanLength, 0, width), height);
+          for (int i=0; i<dezDiagonalPeaks[selectedIndex].size(); i++)
+            line(map(dezDiagonalPeaks[selectedIndex].get(i), 0, diagonalScanLength, 0, width), 0, map(dezDiagonalPeaks[selectedIndex].get(i), 0, diagonalScanLength, 0, width), height);
           fill(255);
-          for (int i=0; i<numSlices; i++)
-            text(dezDiagonalPeaks[i][selectedIndex], 10, 50+20*i);
           if (fancyPeaks)
             text(bestDiagonalSettings[selectedIndex].x+" "+bestDiagonalSettings[selectedIndex].y+" "+bestDiagonalSettings[selectedIndex].z, width-200, 50);
         }
@@ -542,7 +379,14 @@ void draw()
       }
     }
     fill(255, 0, 0);
-    text(selectedIndex, 10, 10);
+    text("sensor:  ("+(selectedIndex%3)+", "+(selectedIndex/3)+" )", 10, 10);
+    text("press 1 to toggle derivative peaks, 2 to toggle dez peaks", 10, 50);
+    fill(0,0, 255);
+    if(showDezPeaks)
+      text("dez peaks", 10, 70);
+    fill(255,0,0);
+    if(showDerivativePeaks)
+      text("derivative peaks", 10, 90);
   }
 }
 

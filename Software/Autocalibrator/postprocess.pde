@@ -3,10 +3,10 @@ void postProcess(IntList peaks)
   FloatList floatPeaks=new FloatList();
   for (int i=0; i<peaks.size (); i++)
     floatPeaks.append(peaks.get(i));
-  postProcess(floatPeaks);
+  postProcess(floatPeaks, numSlices);
 }
 
-float[] postProcess(FloatList candidates)
+float[] postProcess(FloatList candidates, int expectedPeaks)
 {
   FloatList output = new FloatList();
   if (expectedPeaks < 3) //if we have less than 3 expected peaks, the code below this is useless. Just return what we have.

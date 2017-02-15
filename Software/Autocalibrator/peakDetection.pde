@@ -1,9 +1,55 @@
+int[] numHorizontalPeaks, numDiagonalPeaks;
+  float badValue = -9999f; //what value do we return in the array when we think there is a missing element there?
+
+void findBestDezPeaks()
+{
+  int[] data;
+  numHorizontalPeaks=new int[numPorts];
+  numDiagonalPeaks=new int[numPorts];
+  ///    find Dez peaks by scan through all possible settings and looking for the most peaks
+  for (allowedDeviation=0; allowedDeviation<.2; allowedDeviation+=.05)
+    for (minPeakFreq=5; minPeakFreq<30; minPeakFreq+=5)
+      for (minPeakAmplitude=5; minPeakAmplitude<50; minPeakAmplitude+=5)
+      {
+        //        println(allowedDeviation+" "+minPeakFreq+" "+minPeakAmplitude);
+        for (int j=0; j<numPorts; j++)
+        {
+          data=new int[horizontalScanLength];
+          for (int i=0; i<data.length; i++)
+            data[i]=horizontalScan[i][j];
+          data=lowPass(data,10);  //try putting the data through a low-pass filter first
+          peaks=getPeaksFromData(minPeakAmplitude, minPeakFreq, numSlices, allowedDeviation, data);
+          num=0;
+          if (peaks.size()>numHorizontalPeaks[j])   
+          {    
+            numHorizontalPeaks[j]=peaks.size();
+            bestHorizontalSettings[j]=new PVector(allowedDeviation, minPeakFreq, minPeakAmplitude);
+            dezHorizontalPeaks[j]=peaks;
+          }
+          data=new int[diagonalScanLength];
+          for (int i=0; i<data.length; i++)
+            data[i]=diagonalScan[i][j];
+          data=lowPass(data, 10 );  //try putting the data through a low-pass filter first
+          peaks=getPeaksFromData(minPeakAmplitude, minPeakFreq, numSlices, allowedDeviation, data);
+          num=0;
+          for (int k=0; k<peaks.size (); k++)
+            if (peaks.get(k)>0)
+              num++;
+          if (num>numDiagonalPeaks[j])   
+          {    
+            bestDiagonalSettings[j]=new PVector(allowedDeviation, minPeakFreq, minPeakAmplitude);
+            numDiagonalPeaks[j]=num;
+            dezDiagonalPeaks[j]=peaks;
+          }
+        }
+      }
+}
+
 
 FloatList getPeaksFromData(int minPeakAmplitude, int minPeakFreq, int expectedPeaks, float allowedDeviation, int[] data)
 {
 
   //first lets bottom out the data. This will help with figuring out the center of the peaks later.
-  float badValue = -9999f; //what value do we return in the array when we think there is a missing element there?
   int minVal = 100000;
   for (int i=0; i<data.length; i++)
   {
@@ -49,9 +95,9 @@ FloatList getPeaksFromData(int minPeakAmplitude, int minPeakFreq, int expectedPe
   {
 //    println("Could not find any peaks in the given data. Is the sensor broken? Printing raw data to log...");
     //    println(data);
-    float[] error=new float[numSlices];
+    FloatList error=new FloatList();
     for (int i=0; i<numSlices; i++)
-      error[i]=-1;
+      error.append(-1);
     return error; //could not find peaks
   }
 
