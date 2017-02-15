@@ -64,7 +64,7 @@ void setup()
   //run.txt holds the latest run number, so each time we collect data, we save it in a sequentially numbered file
   String[] lines=loadStrings(dataPath("run.txt"));
   run=int(lines[0])+1;
-  loadData("run 40.csv");  //comment this line out to actually collect data from the sensors.  If we run loadData, it skips the data collection and goes straight to analysis, so you can run it without any hardware connected
+  //loadData("run 40.csv");  //comment this line out to actually collect data from the sensors.  If we run loadData, it skips the data collection and goes straight to analysis, so you can run it without any hardware connected
   setupSensors();
 }
 
