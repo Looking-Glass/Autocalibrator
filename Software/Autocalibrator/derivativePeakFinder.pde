@@ -9,7 +9,7 @@ int to, from;
 
 FloatList processData(int[] rawData)
 {
-  return processData(rawData, 25, 20);
+  return processData(rawData, 10, 10);
 }
 
 
@@ -100,7 +100,7 @@ int[] lowPass(int[] data, int filterDegree)
   return secondPass;
 }
 
-
+/*
 FloatList derivativeFilter(int minPeakAmplitude, int minPeakFreq, int expectedPeaks, float allowedDeviation, IntList candidates)
 {
   float badValue = -9999f; //what value do we return in the array when we think there is a missing element there?
@@ -153,7 +153,7 @@ FloatList derivativeFilter(int minPeakAmplitude, int minPeakFreq, int expectedPe
 
   return output;
 }
-
+*/
 
 class LowPass {
   ArrayList buffer;
@@ -180,4 +180,3 @@ class LowPass {
     output = sum / buffer.size();
   }
 }
-

@@ -1,3 +1,7 @@
+
+
+
+
 void postProcess(IntList peaks)
 {
   FloatList floatPeaks=new FloatList();
@@ -6,7 +10,7 @@ void postProcess(IntList peaks)
   postProcess(floatPeaks, numSlices);
 }
 
-float[] postProcess(FloatList candidates, int expectedPeaks)
+FloatList postProcess(FloatList candidates, int expectedPeaks)
 {
   FloatList output = new FloatList();
   if (expectedPeaks < 3) //if we have less than 3 expected peaks, the code below this is useless. Just return what we have.
@@ -21,9 +25,13 @@ float[] postProcess(FloatList candidates, int expectedPeaks)
     {
       differences.append(candidates.get(i + 1) - candidates.get(i));
     }
-    float[] outliers=new float[0];
-    int medianIndex = 0;
-    float medianDiff = findOutliers(differences, allowedDeviation, outliers, medianIndex);
+    
+    
+    //this method below is not a good one because it is susceptible to drift.
+    //filter the peaks by going one to the next and determining the outliers like that.
+ /*   int medianIndex = 0;
+    //float medianDiff = findOutliers(differences, allowedDeviation,  medianIndex);
+    float medianDiff = findMedian(differences);
 
     //now lets go through them again, this time having some statistical info in hand (median values)                  
     float startingOffset = candidates.get(medianIndex) % medianDiff; //as best we can know, the medianDiff and medianIndex are well placed data, so lets use them as a base point to check the rest.
@@ -47,6 +55,7 @@ float[] postProcess(FloatList candidates, int expectedPeaks)
       if (!foundMatch)
         output.append(badValue);
     }
+   */ 
   }
 
   int missingElements = expectedPeaks - output.size(); //add any missing.
@@ -55,20 +64,36 @@ float[] postProcess(FloatList candidates, int expectedPeaks)
     output.append(badValue);
   }
 
-  return output.array();
+  return output;
 }
 
-float findOutliers(FloatList data, float allowedDeviation, float[] outliers, int medianIndex)
+float findMedian(FloatList[] f)
+{
+  FloatList allValues = new FloatList();
+  for (int i = 0; i < f.length; i++)
+  {
+    for (int l = 0; l < f[i].size(); l++)
+      allValues.append( f[i].get(l));
+  }
+
+  allValues.sort();
+
+  int medianElement = round(allValues.size()/2);
+  return allValues.get(medianElement);
+}
+
+/*
+float findOutliers(FloatList data, float allowedDeviation, int medianIndex)
 {
   if (data.size() < 3) //there is no point to doing this with a tiny amount of data points.
   {
-    outliers = new float[0];
     medianIndex = 0;
     return data.get(0);
   }
+  
 
   //returns the median difference. outlying values are given in 'outliers'
-  float [] sorted=sort(data.array());
+  float[] sorted=sort(data.array());
 
   int medianElement = round(sorted.length/2);
   float median = sorted[medianElement];
@@ -82,7 +107,6 @@ float findOutliers(FloatList data, float allowedDeviation, float[] outliers, int
       badElements.append(f);
   }
 
-  outliers = badElements.array();
 
   medianIndex = 0;
   for (int d = 0; d < data.size (); d++)
@@ -93,6 +117,7 @@ float findOutliers(FloatList data, float allowedDeviation, float[] outliers, int
 
   return median;
 }
+*/
 
 boolean checkPeak(int first, int middle, int last, int threshold)
 {
@@ -113,4 +138,3 @@ float findPeakInDataPoints(IntList dataPoints, int[] allData, float bias)
   }
   return (float)(total/div);
 }
-
